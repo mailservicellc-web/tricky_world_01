@@ -1,4 +1,14 @@
-export type LevelType = 'find-odd' | 'reaction' | 'trick';
+export type LevelType =
+  | 'find-odd'
+  | 'safe-target'
+  | 'dont-touch'
+  | 'memory'
+  | 'reaction'
+  | 'fake-button'
+  | 'moving-target'
+  | 'reverse'
+  | 'pattern'
+  | 'boss';
 
 export interface LevelDefinition {
   readonly id: string;
@@ -8,4 +18,6 @@ export interface LevelDefinition {
   readonly difficulty: number;
   readonly timeLimitMs: number;
   readonly title: string;
+  readonly instruction: string;
+  readonly accent: number;
 }
