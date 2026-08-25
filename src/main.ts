@@ -1,356 +1,52 @@
 import Phaser from 'phaser';
 import { createInitialGameState, type GameState } from './core/GameState';
-import { LEVELS } from './levels/LevelRegistry';
+import { LEVELS, LEVELS_PER_WORLD, WORLD_COUNT, getWorldLevels } from './levels/LevelRegistry';
 import type { LevelDefinition } from './levels/LevelDefinition';
 
 const state: GameState = createInitialGameState();
+const C = { bg: 0x090b13, panel: 0x121625, panel2: 0x191e31, text: '#f7f8ff', muted: '#9ca6c3', accent: '#8b72ff', danger: '#ff5577', success: '#36e0a0', gold: '#ffd166', cyan: '#35d9ff' };
+const FONT = 'Arial, sans-serif';
 
-const UI = {
-  bg: 0x090b13,
-  panel: 0x121625,
-  panel2: 0x191e31,
-  text: '#f7f8ff',
-  muted: '#9ca6c3',
-  accent: '#8b72ff',
-  danger: '#ff5577',
-  success: '#36e0a0',
-  gold: '#ffd166',
-};
+function bg(scene: Phaser.Scene): void { const { width, height } = scene.scale; scene.cameras.main.setBackgroundColor(C.bg); for (let i=0;i<22;i++){ const d=scene.add.circle(Phaser.Math.Between(0,width),Phaser.Math.Between(0,height),Phaser.Math.Between(1,3),0xffffff,Phaser.Math.FloatBetween(.03,.1)); scene.tweens.add({targets:d,alpha:.01,scale:.3,duration:Phaser.Math.Between(1400,3200),yoyo:true,repeat:-1,ease:'Sine.inOut'}); } }
+function btn(scene: Phaser.Scene,x:number,y:number,w:number,h:number,label:string,fn:()=>void,color=C.accent):void { const c=scene.add.container(x,y), shadow=scene.add.rectangle(0,6,w,h,0x000000,.35), body=scene.add.rectangle(0,0,w,h,color).setStrokeStyle(2,0xffffff,.08), text=scene.add.text(0,0,label,{color:C.text,fontFamily:FONT,fontSize:'18px',fontStyle:'bold'}).setOrigin(.5); c.add([shadow,body,text]); body.setInteractive({useHandCursor:true}); body.on('pointerover',()=>scene.tweens.add({targets:c,scale:1.04,duration:90})); body.on('pointerout',()=>scene.tweens.add({targets:c,scale:1,duration:90})); body.on('pointerdown',()=>scene.tweens.add({targets:c,scale:.95,duration:50})); body.on('pointerup',()=>{scene.tweens.add({targets:c,scale:1,duration:80});fn();}); }
+function msg(kind:'clear'|'perfect'|'fail'|'world'|'boss'|'streak'):string { const m={clear:['Okay... that was suspiciously good.','You actually figured it out?!','Fine. You can have this one.','Tricky approves. Unfortunately.','One level down. Ego +10.'],perfect:['PERFECT?! Who gave you permission to be this good?','Zero mistakes. Suspicious behavior detected.','Okay... hacker.','I am starting to regret making this game.'],fail:["That... wasn't the plan.",'Bold strategy. Terrible execution.','Respectfully... WHAT WAS THAT?','Your brain needs a software update.','Tricky: 1 — You: 0'],world:['You survived the tutorial. Unfortunately, it gets worse.','Your brain is officially doing overtime.','Okay... you are actually good.'],boss:['That was supposed to take longer.','You beat THAT?! I need stronger tricks.','...Okay. You win. For now.'],streak:['THE GAME IS GETTING NERVOUS.','Someone stop this person.','Tricky has filed a complaint.','PLEASE GO OUTSIDE. 😂']}[kind]; return Phaser.Utils.Array.GetRandom(m) as string; }
 
-const font = 'Arial, sans-serif';
+class Boot extends Phaser.Scene { constructor(){super('boot')} create(){this.scene.start('menu')} }
+class Menu extends Phaser.Scene { constructor(){super('menu')} create(){bg(this);const {width,height}=this.scale;const a=this.add.text(width/2,height*.17,'TRICKY',{color:C.text,fontFamily:FONT,fontSize:'64px',fontStyle:'bold'}).setOrigin(.5),b=this.add.text(width/2,height*.25,'WORLD',{color:C.accent,fontFamily:FONT,fontSize:'64px',fontStyle:'bold'}).setOrigin(.5);this.tweens.add({targets:[a,b],y:'-=5',duration:1100,yoyo:true,repeat:-1});this.add.text(width/2,height*.34,"THE GAME THAT DOESN'T PLAY FAIR.",{color:C.muted,fontFamily:FONT,fontSize:'16px',letterSpacing:2}).setOrigin(.5);btn(this,width/2,height*.55,width*.62,62,'PLAY',()=>{state.score=0;state.streak=0;state.bestStreak=0;state.totalMistakes=0;state.currentLevelIndex=0;state.selectedWorld=1;this.scene.start('world-select')});btn(this,width/2,height*.67,width*.62,54,'HOW TO PLAY',()=>this.scene.start('howto'),C.panel2);}}
+class HowTo extends Phaser.Scene { constructor(){super('howto')} create(){bg(this);const {width,height}=this.scale;this.add.text(width/2,height*.15,'HOW TO PLAY',{color:C.text,fontFamily:FONT,fontSize:'32px',fontStyle:'bold'}).setOrigin(.5);['Every level hides a trick.','Beat the clock for a bigger score.','Wrong taps break your streak.','Some instructions lie. Trust nothing.','Boss levels combine the tricks.'].forEach((x,i)=>this.add.text(width*.14,height*(.29+i*.09),`${i+1}.  ${x}`,{color:i===3?C.gold:C.text,fontFamily:FONT,fontSize:'17px',wordWrap:{width:width*.72}}));btn(this,width/2,height*.82,width*.5,52,'← BACK',()=>this.scene.start('menu'),C.panel2);}}
+class WorldSelect extends Phaser.Scene { constructor(){super('world-select')} create(){bg(this);const {width,height}=this.scale;this.add.text(width/2,height*.11,'CHOOSE YOUR WORLD',{color:C.text,fontFamily:FONT,fontSize:'28px',fontStyle:'bold'}).setOrigin(.5);for(let w=1;w<=WORLD_COUNT;w++){const y=height*(.28+(w-1)*.2), levels=getWorldLevels(w), unlocked=w===1;const card=this.add.rectangle(width/2,y,width*.8,112,unlocked?C.panel:0x10121c).setStrokeStyle(2,unlocked?C.accent:0x303448,.4);this.add.text(width*.16,y-27,`WORLD ${String(w).padStart(2,'0')}`,{color:unlocked?C.gold:C.muted,fontFamily:FONT,fontSize:'13px',fontStyle:'bold'});this.add.text(width*.16,y+2,['LEARN THE TRICK',"DON'T TRUST YOUR BRAIN",'CHAOS'][w-1],{color:unlocked?C.text:C.muted,fontFamily:FONT,fontSize:'19px',fontStyle:'bold'});this.add.text(width*.16,y+32,`${levels.length} levels  •  ${unlocked?'READY':'LOCKED'}`,{color:C.muted,fontFamily:FONT,fontSize:'13px'});if(unlocked){card.setInteractive({useHandCursor:true});card.on('pointerup',()=>{state.selectedWorld=w;state.currentLevelIndex=(w-1)*LEVELS_PER_WORLD;this.scene.start('game')})}else this.add.text(width*.84,y,'🔒',{fontSize:'22px'}).setOrigin(.5)}btn(this,width/2,height*.91,width*.44,46,'← HOME',()=>this.scene.start('menu'),C.panel2);}}
 
-function roundedButton(scene: Phaser.Scene, x: number, y: number, width: number, height: number, label: string, onClick: () => void): void {
-  const container = scene.add.container(x, y);
-  const shadow = scene.add.rectangle(0, 7, width, height, 0x000000, 0.28).setOrigin(0.5);
-  const body = scene.add.rectangle(0, 0, width, height, UI.accent, 1).setOrigin(0.5).setStrokeStyle(2, 0xffffff, 0.08);
-  const text = scene.add.text(0, 0, label, { color: UI.text, fontFamily: font, fontSize: '22px', fontStyle: 'bold' }).setOrigin(0.5);
-  container.add([shadow, body, text]);
-  body.setInteractive({ useHandCursor: true });
-  body.on('pointerover', () => scene.tweens.add({ targets: container, scale: 1.04, duration: 100, ease: 'Quad.out' }));
-  body.on('pointerout', () => scene.tweens.add({ targets: container, scale: 1, duration: 100 }));
-  body.on('pointerdown', () => scene.tweens.add({ targets: container, scale: 0.96, duration: 60 }));
-  body.on('pointerup', () => {
-    scene.tweens.add({ targets: container, scale: 1, duration: 80 });
-    onClick();
-  });
+class Game extends Phaser.Scene {
+  private level!:LevelDefinition; private elapsed=0; private locked=false; private paused=false; private mistakes=0; private fill!:Phaser.GameObjects.Rectangle; private timerText!:Phaser.GameObjects.Text; private scoreText!:Phaser.GameObjects.Text; private streakText!:Phaser.GameObjects.Text; private pauseLayer?:Phaser.GameObjects.Container; private objects:Phaser.GameObjects.GameObject[]=[];
+  constructor(){super('game')}
+  create(){bg(this);this.level=LEVELS[state.currentLevelIndex]??LEVELS[0];this.elapsed=0;this.locked=false;this.paused=false;this.mistakes=0;this.objects=[];const {width,height}=this.scale;
+    this.add.text(24,22,`WORLD ${String(this.level.world).padStart(2,'0')}  •  LEVEL ${String(this.level.number).padStart(2,'0')}/${LEVELS_PER_WORLD}`,{color:C.muted,fontFamily:FONT,fontSize:'13px',fontStyle:'bold'});this.scoreText=this.add.text(24,48,`SCORE  ${state.score.toLocaleString()}`,{color:C.gold,fontFamily:FONT,fontSize:'16px',fontStyle:'bold'});this.streakText=this.add.text(width-70,25,`🔥 ${state.streak}`,{color:C.gold,fontFamily:FONT,fontSize:'17px',fontStyle:'bold'}).setOrigin(1,0);
+    this.add.rectangle(width*.1,91,width*.8,12,C.panel2).setOrigin(0,.5);this.fill=this.add.rectangle(width*.1,91,width*.8,12,C.success).setOrigin(0,.5);this.timerText=this.add.text(width/2,91,'',{color:C.text,fontFamily:FONT,fontSize:'12px',fontStyle:'bold'}).setOrigin(.5);const p=this.add.text(width-22,59,'Ⅱ',{color:C.text,fontFamily:FONT,fontSize:'23px',fontStyle:'bold'}).setOrigin(1,.5).setInteractive({useHandCursor:true});p.on('pointerup',()=>this.togglePause());
+    this.add.text(width/2,height*.15,this.level.title,{color:C.text,fontFamily:FONT,fontSize:'29px',fontStyle:'bold'}).setOrigin(.5);this.add.text(width/2,height*.205,this.level.instruction,{color:C.muted,fontFamily:FONT,fontSize:'16px',align:'center',wordWrap:{width:width*.82}}).setOrigin(.5);this.render();
+  }
+  update(_:number,delta:number){if(this.locked||this.paused)return;this.elapsed+=delta;const left=Math.max(0,this.level.timeLimitMs-this.elapsed),ratio=left/this.level.timeLimitMs,sec=left/1000;this.fill.displayWidth=this.scale.width*.8*ratio;this.fill.setFillStyle(sec<1.8?C.danger:sec<3.5?C.gold:C.success);this.fill.alpha=sec<1.8?.55+Math.sin(this.time.now/70)*.45:1;this.timerText.setText(`${sec.toFixed(1)}s`);this.timerText.setColor(sec<1.8?C.danger:C.text);if(left<=0)this.fail("TIME'S UP");}
+  private add<T extends Phaser.GameObjects.GameObject>(o:T):T{this.objects.push(o);return o}
+  private render(){switch(this.level.type){case'find-odd':this.findOdd();break;case'safe-target':this.safe();break;case'dont-touch':this.dontTouch();break;case'memory':this.memory();break;case'fake-button':this.fake();break;case'moving-target':this.moving();break;case'reverse':this.reverse();break;case'pattern':this.pattern();break;case'reaction':this.reaction();break;case'boss':this.boss();break;}}
+  private hit(o:Phaser.GameObjects.GameObject,ok:boolean){o.setInteractive({useHandCursor:true});o.on('pointerup',()=>ok?this.win():this.mistake(o));}
+  private findOdd(){const {width,height}=this.scale,g=Math.min(7,4+Math.floor(this.level.difficulty/2)),n=g*g,target=Phaser.Math.Between(0,n-1),gap=Math.min(width,height)*(g>=6?.095:.13),sx=width/2-(g-1)*gap/2,sy=height*.49-(g-1)*gap/2;for(let i=0;i<n;i++){const x=sx+i%g*gap,y=sy+Math.floor(i/g)*gap,r=Math.min(width,height)*(g>=6?.023:.032),odd=i===target,c=this.add(this.add.circle(x,y,r,odd?0x5c6bff:0x505c98));this.hit(c,odd);this.tweens.add({targets:c,scale:{from:.6,to:1},alpha:{from:0,to:1},duration:180,delay:i*8,ease:'Back.out'});}}
+  private safe(){const {width,height}=this.scale;for(let i=0;i<7;i++){const a=Math.PI*2*i/7,x=width/2+Math.cos(a)*width*.27,y=height*.5+Math.sin(a)*height*.16,good=i===3,s=this.add(this.add.star(x,y,5,31,14,good?C.success:C.danger));this.hit(s,good);this.tweens.add({targets:s,angle:good?360:-360,duration:1400+i*100,repeat:-1})}}
+  private dontTouch(){const {width,height}=this.scale;const ring=this.add(this.add.circle(width/2,height*.5,74,C.danger,.12).setStrokeStyle(7,C.danger,.75)),core=this.add(this.add.circle(width/2,height*.5,52,C.danger));this.hit(core,false);this.tweens.add({targets:ring,scale:1.35,alpha:.15,duration:650,yoyo:true,repeat:-1});this.add.text(width/2,height*.66,'DO NOT TAP',{color:C.text,fontFamily:FONT,fontSize:'18px',fontStyle:'bold'}).setOrigin(.5);this.time.delayedCall(2300,()=>{if(!this.locked)this.win()});}
+  private memory(){const {width,height}=this.scale,pads:Phaser.GameObjects.Rectangle[]=[];const seq=Phaser.Utils.Array.Shuffle([0,1,2,3,0,1]).slice(0,3+Math.min(2,Math.floor(this.level.difficulty/3))) as number[];let ready=false,pos=0;for(let i=0;i<4;i++){const p=this.add(this.add.rectangle(width*(i%2?.63:.37),height*(i<2?.43:.59),88,88,[0x7c5cff,0x00b8d9,0xff5577,0xffb020][i],.9));p.setInteractive({useHandCursor:true});p.on('pointerup',()=>{if(!ready||this.locked)return;if(i!==seq[pos]){this.mistake(p);return}pos++;this.tweens.add({targets:p,scale:1.15,duration:80,yoyo:true});if(pos===seq.length)this.win()});pads.push(p)}seq.forEach((v,s)=>this.time.delayedCall(500+s*550,()=>this.tweens.add({targets:pads[v%4],scale:1.18,alpha:.3,duration:150,yoyo:true})));this.time.delayedCall(500+seq.length*550,()=>ready=true);}
+  private fake(){const {width,height}=this.scale,labels=['CLICK ME','SAFE','OBVIOUS','DO NOT PRESS'],safe=Phaser.Math.Between(0,3);labels.forEach((t,i)=>{const y=height*.37+i*70,b=this.add(this.add.rectangle(width/2,y,width*.65,54,i===safe?C.panel2:C.accent));this.add.text(width/2,y,t,{color:C.text,fontFamily:FONT,fontSize:'16px',fontStyle:'bold'}).setOrigin(.5);this.hit(b,i===safe)});}
+  private moving(){const {width,height}=this.scale,t=this.add(this.add.circle(width*.18,height*.5,32,C.success));this.hit(t,true);this.tweens.add({targets:t,x:width*.82,y:height*.43,duration:600,yoyo:true,repeat:-1,ease:'Sine.inOut'});}
+  private reverse(){const {width,height}=this.scale;this.add.text(width/2,height*.37,'YOUR FIRST INSTINCT IS WRONG',{color:C.gold,fontFamily:FONT,fontSize:'15px',fontStyle:'bold'}).setOrigin(.5);const a=this.add(this.add.circle(width*.34,height*.57,53,C.success)),b=this.add(this.add.circle(width*.66,height*.57,53,C.danger));this.hit(a,true);this.hit(b,false);}
+  private pattern(){const {width,height}=this.scale,g=5,gap=54;for(let i=0;i<10;i++){const x=width/2-2*gap+(i%g)*gap,y=height*.48+Math.floor(i/g)*gap,good=i===9,d=this.add(this.add.circle(x,y,18,good?C.panel2:[C.accent,C.success,C.gold][i%3]));if(good)this.hit(d,true);}this.add.text(width/2,height*.67,'Find what breaks the pattern.',{color:C.muted,fontFamily:FONT,fontSize:'15px'}).setOrigin(.5);}
+  private reaction(){const {width,height}=this.scale,t=this.add(this.add.circle(width/2,height*.5,55,C.panel2));this.add.text(width/2,height*.5,'WAIT...',{color:C.text,fontFamily:FONT,fontSize:'15px',fontStyle:'bold'}).setOrigin(.5);this.time.delayedCall(Phaser.Math.Between(700,1800),()=>{if(this.locked)return;t.setFillStyle(C.success);t.removeAllListeners();t.setInteractive({useHandCursor:true});t.on('pointerup',()=>this.win());this.add.text(width/2,height*.63,'NOW!',{color:C.success,fontFamily:FONT,fontSize:'22px',fontStyle:'bold'}).setOrigin(.5)});}
+  private boss(){const {width,height}=this.scale,container=this.add.container(width/2,height*.5),ring=this.add.circle(0,0,108,this.level.accent,.13).setStrokeStyle(4,this.level.accent,.8),core=this.add.circle(0,0,55,this.level.accent).setInteractive({useHandCursor:true}),eye1=this.add.circle(-16,-9,8,0xffffff),eye2=this.add.circle(16,-9,8,0xffffff);container.add([ring,core,eye1,eye2]);this.tweens.add({targets:ring,scale:1.35,alpha:.15,duration:650,yoyo:true,repeat:-1});this.tweens.add({targets:container,angle:360,duration:3200,repeat:-1});core.on('pointerup',()=>this.win());this.add.text(width/2,height*.68,'BOSS — DON’T BLINK',{color:C.danger,fontFamily:FONT,fontSize:'16px',fontStyle:'bold'}).setOrigin(.5);}
+  private mistake(o:Phaser.GameObjects.GameObject){if(this.locked)return;this.mistakes++;this.cameras.main.shake(100,.005);state.totalMistakes++;state.streak=0;this.streakText.setText('🔥 0');this.tweens.add({targets:o,alpha:.25,duration:70,yoyo:true,repeat:2});this.add.text(this.scale.width/2,this.scale.height*.84,msg('fail'),{color:C.danger,fontFamily:FONT,fontSize:'16px',fontStyle:'bold'}).setOrigin(.5).setDepth(50);}
+  private win(){if(this.locked)return;this.locked=true;const left=Math.max(0,this.level.timeLimitMs-this.elapsed),speed=Math.round(left/18),perfect=this.mistakes===0,combo=state.streak*90,gain=900+this.level.difficulty*70+speed+combo+(perfect?500:0);state.score+=gain;state.lastLevelScore=gain;state.lastLevelPerfect=perfect;state.streak++;state.bestStreak=Math.max(state.bestStreak,state.streak);this.showClear(gain,perfect);}
+  private showClear(gain:number,perfect:boolean){const {width,height}=this.scale;this.cameras.main.flash(170,255,255,255);for(let i=0;i<24;i++){const p=this.add.circle(width/2,height*.48,Phaser.Math.Between(3,7),[C.accent,C.success,C.gold,C.cyan][i%4]);this.tweens.add({targets:p,x:p.x+Phaser.Math.Between(-width*.45,width*.45),y:p.y+Phaser.Math.Between(-height*.35,height*.35),alpha:0,scale:.2,duration:750,ease:'Cubic.out'})}const panel=this.add.rectangle(width/2,height*.53,width*.84,height*.43,C.panel,.98).setStrokeStyle(2,perfect?C.gold:C.success,.75).setScale(.65),title=this.add.text(width/2,height*.38,perfect?'✦ PERFECT ✦':'LEVEL CLEAR',{color:perfect?C.gold:C.success,fontFamily:FONT,fontSize:'31px',fontStyle:'bold'}).setOrigin(.5).setAlpha(0),score=this.add.text(width/2,height*.5,'+0',{color:C.text,fontFamily:FONT,fontSize:'43px',fontStyle:'bold'}).setOrigin(.5).setAlpha(0),quote=this.add.text(width/2,height*.61,msg(perfect?'perfect':'clear'),{color:C.muted,fontFamily:FONT,fontSize:'15px',align:'center',wordWrap:{width:width*.68}}).setOrigin(.5).setAlpha(0),next=this.add.text(width/2,height*.73,'NEXT LEVEL →',{color:C.text,fontFamily:FONT,fontSize:'18px',fontStyle:'bold'}).setOrigin(.5).setAlpha(0);this.tweens.add({targets:panel,scale:1,duration:280,ease:'Back.out'});this.tweens.add({targets:[title,score,quote,next],alpha:1,duration:220,delay:120,stagger:90});this.tweens.addCounter({from:0,to:gain,duration:650,delay:180,onUpdate:t=>score.setText(`+${Math.round(t.getValue()).toLocaleString()}`)});if(state.streak>=3){this.add.text(width/2,height*.79,msg('streak'),{color:C.gold,fontFamily:FONT,fontSize:'14px',fontStyle:'bold'}).setOrigin(.5).setAlpha(0).setName('streakMessage');this.tweens.add({targets:this.children.getByName('streakMessage'),alpha:1,delay:850,duration:200})}this.time.delayedCall(1450,()=>this.next());}
+  private fail(reason:string){if(this.locked)return;this.locked=true;state.streak=0;state.lastLevelScore=0;state.lastLevelPerfect=false;this.cameras.main.shake(180,.009);this.time.delayedCall(450,()=>this.showFail(reason));}
+  private showFail(reason:string){const {width,height}=this.scale;this.add.rectangle(width/2,height/2,width,height,0x05060b,.82).setDepth(80);this.add.text(width/2,height*.34,'TRICKY WINS 😈',{color:C.danger,fontFamily:FONT,fontSize:'31px',fontStyle:'bold'}).setOrigin(.5).setDepth(81);this.add.text(width/2,height*.43,reason,{color:C.text,fontFamily:FONT,fontSize:'17px',fontStyle:'bold'}).setOrigin(.5).setDepth(81);this.add.text(width/2,height*.51,msg('fail'),{color:C.muted,fontFamily:FONT,fontSize:'16px',align:'center',wordWrap:{width:width*.7}}).setOrigin(.5).setDepth(81);btn(this,width/2,height*.64,width*.58,54,'↻ TRY AGAIN',()=>this.scene.restart(),C.accent);btn(this,width/2,height*.74,width*.58,48,'← WORLD MAP',()=>this.scene.start('world-select'),C.panel2);}
+  private next(){const next=state.currentLevelIndex+1;if(this.level.number===LEVELS_PER_WORLD){this.scene.start('world-complete');return}state.currentLevelIndex=next;this.scene.restart();}
+  private togglePause(){if(this.locked)return;this.paused=!this.paused;state.phase=this.paused?'paused':'playing';if(this.paused){this.tweens.pauseAll();this.pauseLayer=this.add.container(0,0).setDepth(100);this.pauseLayer.add(this.add.rectangle(this.scale.width/2,this.scale.height/2,this.scale.width,this.scale.height,0x05060b,.86));this.pauseLayer.add(this.add.text(this.scale.width/2,this.scale.height*.29,'PAUSED',{color:C.text,fontFamily:FONT,fontSize:'38px',fontStyle:'bold'}).setOrigin(.5));btn(this,this.scale.width/2,this.scale.height*.49,this.scale.width*.56,54,'▶ RESUME',()=>this.togglePause(),C.success);btn(this,this.scale.width/2,this.scale.height*.6,this.scale.width*.56,50,'↻ RESTART',()=>this.scene.restart());btn(this,this.scale.width/2,this.scale.height*.7,this.scale.width*.56,48,'← WORLD MAP',()=>this.scene.start('world-select'),C.panel2)}else{this.pauseLayer?.destroy();this.pauseLayer=undefined;this.tweens.resumeAll();}}
 }
+class WorldComplete extends Phaser.Scene { constructor(){super('world-complete')} create(){bg(this);const {width,height}=this.scale,w=state.selectedWorld;this.add.text(width/2,height*.19,`WORLD ${String(w).padStart(2,'0')} COMPLETE!`,{color:C.gold,fontFamily:FONT,fontSize:'31px',fontStyle:'bold'}).setOrigin(.5);this.add.text(width/2,height*.31,msg(w===1?'world':'world'),{color:C.text,fontFamily:FONT,fontSize:'18px',align:'center',wordWrap:{width:width*.75}}).setOrigin(.5);this.add.text(width/2,height*.46,`SCORE  ${state.score.toLocaleString()}\n🔥 BEST STREAK  ${state.bestStreak}`,{color:C.muted,fontFamily:FONT,fontSize:'18px',align:'center'}).setOrigin(.5);if(w<WORLD_COUNT)btn(this,width/2,height*.64,width*.58,58,`ENTER WORLD ${w+1} →`,()=>{state.selectedWorld=w+1;state.currentLevelIndex=w*LEVELS_PER_WORLD;this.scene.start('game')});else btn(this,width/2,height*.64,width*.58,58,'🏆 YOU BEAT TRICKY',()=>this.scene.start('world-select'));btn(this,width/2,height*.74,width*.5,48,'← WORLD MAP',()=>this.scene.start('world-select'),C.panel2);}}
 
-function addBackground(scene: Phaser.Scene): void {
-  const { width, height } = scene.scale;
-  scene.cameras.main.setBackgroundColor(UI.bg);
-  for (let i = 0; i < 16; i += 1) {
-    const x = Phaser.Math.Between(0, width);
-    const y = Phaser.Math.Between(0, height);
-    const dot = scene.add.circle(x, y, Phaser.Math.Between(1, 3), 0xffffff, Phaser.Math.FloatBetween(0.04, 0.12));
-    scene.tweens.add({ targets: dot, alpha: 0.02, duration: Phaser.Math.Between(1800, 3500), yoyo: true, repeat: -1 });
-  }
-}
-
-class BootScene extends Phaser.Scene {
-  constructor() { super('boot'); }
-  create(): void { this.scene.start('menu'); }
-}
-
-class MenuScene extends Phaser.Scene {
-  constructor() { super('menu'); }
-
-  create(): void {
-    addBackground(this);
-    const { width, height } = this.scale;
-
-    this.add.text(width / 2, height * 0.18, 'TRICKY', { color: UI.text, fontFamily: font, fontSize: '64px', fontStyle: 'bold' }).setOrigin(0.5);
-    this.add.text(width / 2, height * 0.25, 'WORLD', { color: UI.accent, fontFamily: font, fontSize: '64px', fontStyle: 'bold' }).setOrigin(0.5);
-    this.add.text(width / 2, height * 0.34, "THE GAME THAT DOESN'T PLAY FAIR.", { color: UI.muted, fontFamily: font, fontSize: '17px', letterSpacing: 2 }).setOrigin(0.5);
-
-    const card = this.add.rectangle(width / 2, height * 0.54, width * 0.82, height * 0.19, UI.panel, 1).setOrigin(0.5).setStrokeStyle(1, 0xffffff, 0.08);
-    this.add.text(width / 2, height * 0.49, 'WORLD 01', { color: UI.gold, fontFamily: font, fontSize: '16px', fontStyle: 'bold' }).setOrigin(0.5);
-    this.add.text(width / 2, height * 0.55, '10 levels of tricks, speed & chaos', { color: UI.text, fontFamily: font, fontSize: '20px' }).setOrigin(0.5);
-    this.add.text(width / 2, height * 0.61, 'Think fast. Trust nothing.', { color: UI.muted, fontFamily: font, fontSize: '15px' }).setOrigin(0.5);
-    card.setDepth(-1);
-
-    roundedButton(this, width / 2, height * 0.76, width * 0.58, 66, 'PLAY WORLD 01', () => {
-      state.phase = 'playing';
-      state.currentLevelIndex = 0;
-      state.score = 0;
-      state.streak = 0;
-      state.bestStreak = 0;
-      state.totalMistakes = 0;
-      this.scene.start('game');
-    });
-  }
-}
-
-class GameScene extends Phaser.Scene {
-  private level!: LevelDefinition;
-  private levelStart = 0;
-  private timeLeft = 0;
-  private timerText!: Phaser.GameObjects.Text;
-  private feedbackText!: Phaser.GameObjects.Text;
-  private locked = false;
-  private targetIndex = -1;
-  private cleanup: Array<() => void> = [];
-
-  constructor() { super('game'); }
-
-  create(): void {
-    addBackground(this);
-    this.locked = false;
-    this.cleanup = [];
-    this.level = LEVELS[state.currentLevelIndex] ?? LEVELS[0];
-    this.levelStart = this.time.now;
-    this.timeLeft = this.level.timeLimitMs;
-
-    const { width, height } = this.scale;
-    this.add.text(28, 30, `WORLD 01  •  ${String(this.level.number).padStart(2, '0')}/10`, { color: UI.muted, fontFamily: font, fontSize: '15px', fontStyle: 'bold' });
-    this.add.text(width - 28, 30, `🔥 ${state.streak}`, { color: UI.gold, fontFamily: font, fontSize: '17px', fontStyle: 'bold' }).setOrigin(1, 0);
-
-    this.timerText = this.add.text(width / 2, 54, '', { color: UI.text, fontFamily: font, fontSize: '22px', fontStyle: 'bold' }).setOrigin(0.5);
-    this.add.rectangle(width * 0.12, 88, width * 0.76, 6, UI.panel2).setOrigin(0, 0.5);
-
-    this.add.text(width / 2, height * 0.15, this.level.title, { color: UI.text, fontFamily: font, fontSize: '30px', fontStyle: 'bold' }).setOrigin(0.5);
-    this.add.text(width / 2, height * 0.20, this.level.instruction, { color: UI.muted, fontFamily: font, fontSize: '17px' }).setOrigin(0.5);
-    this.feedbackText = this.add.text(width / 2, height * 0.88, '', { color: UI.text, fontFamily: font, fontSize: '20px', fontStyle: 'bold' }).setOrigin(0.5);
-
-    this.renderLevel();
-    this.events.once('shutdown', () => this.cleanup.forEach((fn) => fn()));
-  }
-
-  update(): void {
-    if (this.locked) return;
-    const elapsed = this.time.now - this.levelStart;
-    this.timeLeft = Math.max(0, this.level.timeLimitMs - elapsed);
-    const seconds = this.timeLeft / 1000;
-    this.timerText.setText(`${seconds.toFixed(1)}s`);
-    this.timerText.setColor(seconds < 2 ? UI.danger : UI.text);
-    if (this.timeLeft <= 0) this.fail('TIME\'S UP');
-  }
-
-  private renderLevel(): void {
-    switch (this.level.type) {
-      case 'find-odd': this.renderFindOdd(); break;
-      case 'safe-target': this.renderSafeTarget(); break;
-      case 'dont-touch': this.renderDontTouch(); break;
-      case 'memory': this.renderMemory(); break;
-      case 'fake-button': this.renderFakeButton(); break;
-      case 'moving-target': this.renderMovingTarget(); break;
-      case 'reverse': this.renderReverse(); break;
-      case 'pattern': this.renderPattern(); break;
-      case 'boss': this.renderBoss(); break;
-    }
-  }
-
-  private renderFindOdd(): void {
-    const { width, height } = this.scale;
-    const grid = this.level.difficulty >= 4 ? 5 : 4;
-    const count = grid * grid;
-    this.targetIndex = Phaser.Math.Between(0, count - 1);
-    const gap = Math.min(width, height) * 0.15;
-    const startX = width / 2 - ((grid - 1) * gap) / 2;
-    const startY = height * 0.47 - ((grid - 1) * gap) / 2;
-    const base = Phaser.Display.Color.GetColor(80 + this.level.difficulty * 4, 92, 150);
-    const odd = Phaser.Display.Color.GetColor(100 + this.level.difficulty * 8, 92, 150);
-
-    for (let i = 0; i < count; i += 1) {
-      const row = Math.floor(i / grid);
-      const col = i % grid;
-      const circle = this.add.circle(startX + col * gap, startY + row * gap, Math.min(width, height) * (grid === 5 ? 0.035 : 0.042), i === this.targetIndex ? odd : base);
-      circle.setInteractive({ useHandCursor: true });
-      circle.on('pointerup', () => i === this.targetIndex ? this.win() : this.mistake(circle));
-      this.cleanup.push(() => circle.destroy());
-    }
-  }
-
-  private renderSafeTarget(): void {
-    const { width, height } = this.scale;
-    const count = 5;
-    this.targetIndex = Phaser.Math.Between(0, count - 1);
-    for (let i = 0; i < count; i += 1) {
-      const x = width * (0.18 + i * 0.16);
-      const y = height * 0.5;
-      const shape = this.add.star(x, y, 5, 34, 15, i === this.targetIndex ? 0x36e0a0 : 0xff5577);
-      shape.setInteractive({ useHandCursor: true });
-      shape.on('pointerup', () => i === this.targetIndex ? this.win() : this.mistake(shape));
-    }
-  }
-
-  private renderDontTouch(): void {
-    const { width, height } = this.scale;
-    const danger = this.add.circle(width / 2, height * 0.52, Math.min(width, height) * 0.1, UI.danger, 0.9);
-    danger.setInteractive({ useHandCursor: true });
-    danger.on('pointerup', () => this.fail('YOU TOUCHED IT'));
-    this.tweens.add({ targets: danger, scale: 1.18, alpha: 0.5, duration: 700, yoyo: true, repeat: -1 });
-    this.time.delayedCall(2500, () => { if (!this.locked) this.win(); });
-  }
-
-  private renderMemory(): void {
-    const { width, height } = this.scale;
-    const buttons = [0, 1, 2, 3];
-    const sequence = Phaser.Utils.Array.Shuffle([...buttons]).slice(0, 3) as number[];
-    let accepting = false;
-    let position = 0;
-    const pads = buttons.map((i) => {
-      const x = width * (i % 2 === 0 ? 0.37 : 0.63);
-      const y = height * (i < 2 ? 0.43 : 0.58);
-      const pad = this.add.rectangle(x, y, 90, 90, [0x7c5cff, 0x00b8d9, 0xff5577, 0xffb020][i], 0.85).setInteractive({ useHandCursor: true });
-      pad.on('pointerup', () => {
-        if (!accepting || this.locked) return;
-        if (i !== sequence[position]) { this.mistake(pad); return; }
-        position += 1;
-        this.tweens.add({ targets: pad, scale: 1.12, duration: 80, yoyo: true });
-        if (position === sequence.length) this.win();
-      });
-      return pad;
-    });
-    sequence.forEach((index, step) => {
-      this.time.delayedCall(650 + step * 650, () => {
-        const pad = pads[index];
-        this.tweens.add({ targets: pad, alpha: 1, scale: 1.16, duration: 140, yoyo: true });
-      });
-    });
-    this.time.delayedCall(650 + sequence.length * 650, () => { accepting = true; });
-  }
-
-  private renderFakeButton(): void {
-    const { width, height } = this.scale;
-    const labels = ['OBVIOUS', 'NOPE', 'CLICK ME', 'NOT THAT'];
-    const safe = Phaser.Math.Between(0, labels.length - 1);
-    labels.forEach((label, i) => {
-      const y = height * 0.40 + i * 72;
-      const button = this.add.rectangle(width / 2, y, width * 0.62, 54, i === safe ? UI.panel2 : UI.accent).setInteractive({ useHandCursor: true });
-      this.add.text(width / 2, y, label, { color: UI.text, fontFamily: font, fontSize: '17px', fontStyle: 'bold' }).setOrigin(0.5);
-      button.on('pointerup', () => i === safe ? this.win() : this.fail('TRICKED'));
-    });
-  }
-
-  private renderMovingTarget(): void {
-    const { width, height } = this.scale;
-    const target = this.add.circle(width * 0.25, height * 0.5, 30, UI.success).setInteractive({ useHandCursor: true });
-    target.on('pointerup', () => this.win());
-    this.tweens.add({ targets: target, x: width * 0.75, y: height * 0.42, duration: 850, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
-  }
-
-  private renderReverse(): void {
-    const { width, height } = this.scale;
-    this.add.text(width / 2, height * 0.40, 'TAP THE', { color: UI.muted, fontFamily: font, fontSize: '18px' }).setOrigin(0.5);
-    this.add.text(width / 2, height * 0.46, 'WRONG', { color: UI.danger, fontFamily: font, fontSize: '42px', fontStyle: 'bold' }).setOrigin(0.5);
-    const left = this.add.circle(width * 0.35, height * 0.6, 48, UI.success).setInteractive({ useHandCursor: true });
-    const right = this.add.circle(width * 0.65, height * 0.6, 48, UI.danger).setInteractive({ useHandCursor: true });
-    left.on('pointerup', () => this.win());
-    right.on('pointerup', () => this.fail('TOO OBVIOUS'));
-  }
-
-  private renderPattern(): void {
-    const { width, height } = this.scale;
-    const values = [1, 2, 3, 1, 2, 3, 1, 2, 0];
-    const gap = 55;
-    values.forEach((value, i) => {
-      const x = width / 2 - 2 * gap + (i % 5) * gap;
-      const y = height * 0.48 + Math.floor(i / 5) * gap;
-      const dot = this.add.circle(x, y, 17, [UI.accent, UI.success, UI.gold][value]);
-      if (i === values.length - 1) {
-        dot.setInteractive({ useHandCursor: true });
-        dot.on('pointerup', () => this.win());
-      }
-    });
-    this.add.text(width / 2, height * 0.68, 'Tap the missing pattern.', { color: UI.muted, fontFamily: font, fontSize: '16px' }).setOrigin(0.5);
-  }
-
-  private renderBoss(): void {
-    const { width, height } = this.scale;
-    const boss = this.add.container(width / 2, height * 0.48);
-    const ring = this.add.circle(0, 0, 105, this.level.accent, 0.14).setStrokeStyle(3, this.level.accent, 0.7);
-    const core = this.add.circle(0, 0, 60, this.level.accent, 1).setInteractive({ useHandCursor: true });
-    const eye = this.add.circle(-16, -8, 8, 0xffffff).setDepth(1);
-    const eye2 = this.add.circle(16, -8, 8, 0xffffff).setDepth(1);
-    const smile = this.add.arc(0, 10, 24, 15, 160, false, 0xffffff, 1).setStrokeStyle(5, 0xffffff);
-    boss.add([ring, core, eye, eye2, smile]);
-    this.tweens.add({ targets: boss, angle: 360, duration: 3000, repeat: -1 });
-    core.on('pointerup', () => {
-      if (this.level.number === 10) {
-        this.fail('THE BOSS WAS A DECOY');
-      } else {
-        this.win();
-      }
-    });
-    this.time.delayedCall(5000, () => { if (!this.locked && this.level.number === 10) this.win(); });
-  }
-
-  private mistake(target: Phaser.GameObjects.GameObject): void {
-    if (this.locked) return;
-    state.totalMistakes += 1;
-    state.streak = 0;
-    this.cameras.main.shake(120, 0.004);
-    this.feedbackText.setText('NOPE').setColor(UI.danger);
-    this.tweens.add({ targets: target, alpha: 0.35, duration: 80, yoyo: true, repeat: 2 });
-  }
-
-  private win(): void {
-    if (this.locked) return;
-    this.locked = true;
-    const elapsed = this.time.now - this.levelStart;
-    const speedBonus = Math.max(0, Math.floor((this.level.timeLimitMs - elapsed) / 100));
-    const perfect = state.totalMistakes === 0 || state.streak > 0;
-    const base = 100 + this.level.difficulty * 25;
-    const streakBonus = state.streak * 20;
-    const gained = base + speedBonus + streakBonus + (perfect ? 50 : 0);
-    state.score += gained;
-    state.lastLevelScore = gained;
-    state.lastLevelPerfect = perfect;
-    state.streak += 1;
-    state.bestStreak = Math.max(state.bestStreak, state.streak);
-    this.feedbackText.setText(perfect ? `PERFECT  +${gained}` : `CLEARED  +${gained}`).setColor(UI.success);
-    this.cameras.main.flash(120, 54, 224, 160, false);
-    this.time.delayedCall(550, () => this.scene.start('result'));
-  }
-
-  private fail(message: string): void {
-    if (this.locked) return;
-    this.locked = true;
-    state.streak = 0;
-    state.lastLevelScore = 0;
-    state.lastLevelPerfect = false;
-    this.feedbackText.setText(message).setColor(UI.danger);
-    this.cameras.main.shake(180, 0.008);
-    this.time.delayedCall(450, () => this.scene.start('result'));
-  }
-}
-
-class ResultScene extends Phaser.Scene {
-  constructor() { super('result'); }
-
-  create(): void {
-    addBackground(this);
-    const { width, height } = this.scale;
-    const levelComplete = state.lastLevelScore > 0;
-    const last = LEVELS[state.currentLevelIndex];
-
-    this.add.text(width / 2, height * 0.19, levelComplete ? 'LEVEL CLEARED!' : 'TRICKED!', {
-      color: levelComplete ? UI.success : UI.danger, fontFamily: font, fontSize: '32px', fontStyle: 'bold',
-    }).setOrigin(0.5);
-    this.add.text(width / 2, height * 0.27, last?.title ?? '', { color: UI.muted, fontFamily: font, fontSize: '16px' }).setOrigin(0.5);
-
-    this.add.text(width / 2, height * 0.39, `${state.score}`, { color: UI.text, fontFamily: font, fontSize: '56px', fontStyle: 'bold' }).setOrigin(0.5);
-    this.add.text(width / 2, height * 0.44, 'TOTAL SCORE', { color: UI.muted, fontFamily: font, fontSize: '13px', fontStyle: 'bold' }).setOrigin(0.5);
-    this.add.text(width / 2, height * 0.51, `🔥 BEST STREAK  ${state.bestStreak}`, { color: UI.gold, fontFamily: font, fontSize: '18px', fontStyle: 'bold' }).setOrigin(0.5);
-
-    const next = levelComplete && state.currentLevelIndex < LEVELS.length - 1;
-    const label = next ? `NEXT: ${state.currentLevelIndex + 2}/10` : levelComplete ? 'WORLD COMPLETE' : 'TRY AGAIN';
-    roundedButton(this, width / 2, height * 0.67, width * 0.62, 62, label, () => {
-      if (next) state.currentLevelIndex += 1;
-      this.scene.start(next ? 'game' : levelComplete ? 'menu' : 'game');
-    });
-
-    roundedButton(this, width / 2, height * 0.77, width * 0.48, 54, 'REPLAY LEVEL', () => this.scene.start('game'));
-  }
-}
-
-const config: Phaser.Types.Core.GameConfig = {
-  type: Phaser.AUTO,
-  parent: 'game',
-  backgroundColor: '#090b13',
-  scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH, width: 720, height: 1280 },
-  scene: [BootScene, MenuScene, GameScene, ResultScene],
-  input: { activePointers: 2 },
-};
-
+const config:Phaser.Types.Core.GameConfig={type:Phaser.AUTO,parent:'game',backgroundColor:'#090b13',scale:{mode:Phaser.Scale.FIT,autoCenter:Phaser.Scale.CENTER_BOTH,width:480,height:800},scene:[Boot,Menu,HowTo,WorldSelect,Game,WorldComplete],input:{activePointers:2}};
 new Phaser.Game(config);
