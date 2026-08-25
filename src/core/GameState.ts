@@ -1,7 +1,8 @@
-export type GamePhase = 'menu' | 'playing' | 'result';
+export type GamePhase = 'menu' | 'world-select' | 'playing' | 'paused' | 'result';
 
 export interface GameState {
   phase: GamePhase;
+  selectedWorld: number;
   currentLevelIndex: number;
   score: number;
   streak: number;
@@ -13,6 +14,7 @@ export interface GameState {
 
 export const createInitialGameState = (): GameState => ({
   phase: 'menu',
+  selectedWorld: 1,
   currentLevelIndex: 0,
   score: 0,
   streak: 0,
