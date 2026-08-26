@@ -31,7 +31,7 @@ export const CHALLENGE_CATALOG: readonly ChallengeSpec[] = [
   {id:'w02-l05',world:2,level:5,kind:'deception',difficulty:5,title:'Color Lie',instruction:'The word and the color disagree.',mechanics:['deception','logic'],timeLimitMs:5500},
   {id:'w02-l06',world:2,level:6,kind:'reverse',difficulty:6,title:'Mirror',instruction:'Everything is reversed. Your instinct is not.',mechanics:['reverse','observation'],timeLimitMs:5500},
   {id:'w02-l07',world:2,level:7,kind:'memory',difficulty:6,title:'Invisible Button',instruction:'Remember where the button disappeared.',mechanics:['memory','observation'],timeLimitMs:6500},
-  {id:'w02-l08',world:2,level:8,kind:'timing',difficulty:7,title:'Fake Countdown',instruction:'Don't panic when the timer lies.',mechanics:['timing','deception'],timeLimitMs:7000},
+  {id:'w02-l08',world:2,level:8,kind:'timing',difficulty:7,title:'Fake Countdown',instruction:"Don't panic when the timer lies.",mechanics:['timing','deception'],timeLimitMs:7000},
   {id:'w02-l09',world:2,level:9,kind:'logic',difficulty:7,title:'The Liar',instruction:'Three statements. Only one is true.',mechanics:['logic','deception'],timeLimitMs:9000},
   {id:'w02-l10',world:2,level:10,kind:'combination',difficulty:8,title:'The Liar Boss',instruction:'The interface itself is trying to fool you.',mechanics:['deception','logic','reaction'],timeLimitMs:12000},
   {id:'w03-l01',world:3,level:1,kind:'memory',difficulty:4,title:'Three Steps',instruction:'Remember three symbols and repeat them.',mechanics:['memory'],timeLimitMs:7000},
